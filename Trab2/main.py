@@ -1,66 +1,109 @@
+import sys
 import pygame
-from grid import Grid, Cell
+
+from grid import Grid
 
 
 pygame.init()
 pygame.font.init()
 
-WIDTH   =  800; HEIGHT =  600
-screen = pygame.display.set_mode((WIDTH, HEIGHT))  
 
-# caso precise de usar fontes na main, descomente
-
-#font_size
-#font = pygame.font.Font(None, font_size)
-
-# caso precise carregar imagens na main, descomente
-
-#idle = pygame.image.load("images/duck/duck.png").convert_alpha()
-#step = pygame.image.load("images/duck/step.png").convert_alpha()
-#etc
+WIDTH = 800; HEIGHT = 600
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
 
-#numero de celulas
-grid_size = (5, 10)
+clock = pygame.time.Clock()
 
+grid_size = (18, 24)
+cell_size = 28
 
-# Cria a janela
-WIDTH   =  800; HEIGHT =  600
-screen = pygame.display.set_mode((WIDTH, HEIGHT))  
+grid_width = grid_size[1] * cell_size
+grid_height = grid_size[0] * cell_size
 
-#criar objetos, adicione eles a lista
-objects = []
+grid_x = (WIDTH - grid_width) // 2
+grid_y = (HEIGHT - grid_height) // 2 + 15
 
-while True: 
+grid = Grid(
+    grid_x,
+    grid_y,
+    [],
+    grid_size,
+    cell_size
+)
+
+objects = [grid]
+
+while True:
+    # tempo entre um frame e outro
+    dt = clock.tick(60) / 1000
+
     for event in pygame.event.get():
+
         if event.type == pygame.QUIT:
-            exit()
+            pygame.quit()
+            sys.exit()
 
-        # uso do mouse é obrigatório
+        # mouse
         elif event.type == pygame.MOUSEBUTTONDOWN:
-            if pygame.mouse.get_pressed()[0]: # 0 botão esquedo 2, direito
-                pass # faça algo
 
-        #caso queira usar levantar o mouse, descomente
-        #elif event.type == pygame.MOUSEBUTTONUP:
-        #                    exit()
+            if event.button == 1:
+                grid.handle_mouse(event.pos)
 
-
-        # uso do teclado para controle é obrigatório
+        # teclado
         elif event.type == pygame.KEYDOWN:
-            #inclua outras funcionalidades para outras téclas
+
             if event.key == pygame.K_ESCAPE:
-                exit()
+                pygame.quit()
+                sys.exit()
 
-        #atualiza
-        for obj in objects:
-            obj.update(1)
+            elif (
+                event.key == pygame.K_UP
+                or event.key == pygame.K_w
+            ):
+                grid.set_direction(
+                    0,
+                    -1,
+                    "UP"
+                )
 
-        # Desenha
-        screen.fill((30, 30, 30))
+            elif (
+                event.key == pygame.K_DOWN
+                or event.key == pygame.K_s
+            ):
+                grid.set_direction(
+                    0,
+                    1,
+                    "DOWN"
+                )
 
+            elif (
+                event.key == pygame.K_LEFT
+                or event.key == pygame.K_a
+            ):
+                grid.set_direction(
+                    -1,
+                    0,
+                    "LEFT"
+                )
 
-        for obj in objects:
-            obj.draw()
+            elif (
+                event.key == pygame.K_RIGHT
+                or event.key == pygame.K_d
+            ):
+                grid.set_direction(
+                    1,
+                    0,
+                    "RIGHT"
+                )
 
-        pygame.display.flip()
+    #atualiza
+    for obj in objects:
+        obj.update(dt)
+
+    # Desenha
+    screen.fill((15, 15, 15))
+
+    for obj in objects:
+        obj.draw(screen)
+
+    pygame.display.flip()
