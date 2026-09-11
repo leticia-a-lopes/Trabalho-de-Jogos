@@ -1,38 +1,75 @@
+from collections import defaultdict
+from collections.abc import Callable
+from typing import Any
+
 import pygame
 
-def singleton(class_):
-    instances = { } 
-    def getinstance(*args, **kwargs):
-        if class_ not in instances:
-            instances[class_] = class_(*args, **kwargs)	# cria se ainda não existe
-        return instances[class_] # armazena para mais tarde
-    return getinstance # devolve a instância unica
 
-@singleton
 class EventHandler:
-    def __init__(self):
-        self.observers = { }  # passa a ser um dicionário onde chave é o tipo de evento
+    _instance = None
 
-    def subscribe(self, type, callback): # passa o tipo de evento também
-        if type not in self.observers: # caso não exista ainda
-            self.observers[type] = [ ]  # cria um novo tipo de evento para notificar
-        self.observers[type].append(callback) # inscreve a chamada ao evento
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._observers = defaultdict(list)
+        return cls._instance
 
-    def notify(self, type, data):
-        if type in self.observers: # checa se tem eventos desse tipo
-            for o in self.observers[type]: # para todos os inscritos nele
-                o(data) # avise que o evento ocorreu
+    def subscribe(self, event_type: str, callback: Callable[..., None]) -> None:
+        if callback not in self._observers[event_type]:
+            self._observers[event_type].append(callback)
+
+    def unsubscribe(self, event_type: str, callback: Callable[..., None]) -> None:
+        callbacks = self._observers.get(event_type, [])
+        if callback in callbacks:
+            callbacks.remove(callback)
+
+    def emit(self, event_type: str, **data: Any) -> None:
+        for callback in tuple(self._observers.get(event_type, ())):
+            callback(**data)
+
+    def notify(self, event_type: str, data: Any = None) -> None:
+        for callback in tuple(self._observers.get(event_type, ())):
+            callback(data)
+
+    def clear(self) -> None:
+        self._observers.clear()
 
 
-def colored_sprite(color, size=(32, 32), circle = True):
-    sprite = pygame.Surface(size)
+SPAWN_PROJECTILE = "spawn_projectile"
+DESTROY_PROJECTILE = "destroy_projectile"
+SPAWN_ENEMY = "spawn_enemy"
+DESTROY_ENEMY = "destroy_enemy"
+ENEMY_HIT = "enemy_hit"
+ENEMY_KILLED = "enemy_killed"
+PLAYER_HIT = "player_hit"
+SPAWN_POWERUP = "spawn_powerup"
+POWERUP_COLLECTED = "powerup_collected"
+WAVE_STARTED = "wave_started"
+
+
+def clamp(value: float, minimum: float, maximum: float) -> float:
+    return max(minimum, min(value, maximum))
+
+
+def circle_collision(p1, r1: float, p2, r2: float) -> bool:
+    return pygame.Vector2(p1).distance_squared_to(p2) <= (r1 + r2) ** 2
+
+
+circle_collistiion = circle_collision
+
+
+def draw_text(surface, text, font, color, position, anchor="topleft"):
+    image = font.render(text, True, color)
+    rect = image.get_rect()
+    setattr(rect, anchor, position)
+    surface.blit(image, rect)
+    return rect
+
+
+def colored_sprite(color, size=(32, 32), circle=True):
+    sprite = pygame.Surface(size, pygame.SRCALPHA)
     if circle:
-        sprite.set_colorkey((0,0,0))
-        pygame.draw.circle(sprite, color, (size[0]//2, size[1]//2), size[0]//2)
+        pygame.draw.circle(sprite, color, (size[0] // 2, size[1] // 2), size[0] // 2)
     else:
         sprite.fill(color)
     return sprite
-
-def circle_collistiion (p1, r1, p2, r2):
-    euc_distance = ((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)**(1/2)
-    return  euc_distance <= r1 + r2

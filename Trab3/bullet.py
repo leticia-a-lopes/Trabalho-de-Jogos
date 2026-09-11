@@ -1,61 +1,85 @@
 import pygame
-from abc import ABC, abstractmethod
-from util import colored_sprite, EventHandler
+
+from settings import ENEMY_BULLET_SPEED, PLAYER_BULLET_SPEED, PROJECTILE_LIFETIME
+from util import DESTROY_PROJECTILE, EventHandler
 
 
-import math
-
-def rotate(pos, angle, axis = (0,0)):
-    angle = math.radians(angle)
-    x, y = pos
-    ax, ay = axis
-
-    # Translate so axis is the origin
-    x -= ax
-    y -= ay
-
-    # Rotate
-    cos_a = math.cos(angle)
-    sin_a = math.sin(angle)
-
-    rx = x * cos_a - y * sin_a
-    ry = x * sin_a + y * cos_a
-
-    # Translate back
-    return rx + ax, ry + ay
-
-class Bullet (ABC):
-
-    def __init__(self, pos, angle = 0, radius = 16, life_time = None):
-        self.pos = pos
-        self.origin = pygame.Vector2(pos)
-        self.life_time = life_time
-        self.angle = angle
-        self.elapsed = 0
+class Projectile:
+    def __init__(
+        self,
+        position,
+        direction,
+        speed,
+        owner,
+        damage,
+        color,
+        radius=5,
+        lifetime=PROJECTILE_LIFETIME,
+    ):
+        self.pos = pygame.Vector2(position)
+        self.direction = pygame.Vector2(direction)
+        if self.direction.length_squared() == 0:
+            self.direction.update(1, 0)
+        self.direction.normalize_ip()
+        self.velocity = self.direction * speed
+        self.owner = owner
+        self.damage = damage
+        self.color = color
         self.radius = radius
-
-        self.sprite = colored_sprite ((255, 0, 0), (self.radius*2, self.radius*2))
+        self.lifetime = lifetime
+        self.alive = True
+        self.trail = []
 
     def update(self, dt):
-
-        self.elapsed += dt
-        if self.life_time and self.elapsed >= self.life_time:
-                self.destroy()       
-
-        self.pos = rotate(self.move(), self.angle)+self.origin
+        if not self.alive:
+            return
+        self.trail.append(self.pos.copy())
+        if len(self.trail) > 5:
+            self.trail.pop(0)
+        self.pos += self.velocity * dt
+        self.lifetime -= dt
+        if self.lifetime <= 0:
+            self.destroy()
 
     def draw(self, screen):
-        screen.blit(self.sprite, self.pos)
+        if not self.alive:
+            return
+        for index, point in enumerate(self.trail):
+            alpha = (index + 1) / max(1, len(self.trail))
+            radius = max(1, int(self.radius * alpha * 0.7))
+            faded = tuple(int(channel * alpha * 0.45) for channel in self.color)
+            pygame.draw.circle(screen, faded, point, radius)
+        pygame.draw.circle(screen, self.color, self.pos, self.radius)
+        pygame.draw.circle(screen, (255, 255, 255), self.pos, max(1, self.radius // 2))
 
-    @abstractmethod
-    def move(self):
-        pass
+    def destroy(self):
+        if self.alive:
+            self.alive = False
+            EventHandler().emit(DESTROY_PROJECTILE, projectile=self)
 
-    def destroy(self): # pede para deletar
-        EventHandler().notify("DestroyObj", self) # avisa o mundo que saiu da tela
 
-class sinBullet (Bullet):
-    # exemplo, façam algo mais rebuscado
+class PlayerProjectile(Projectile):
+    def __init__(self, position, direction, damage=20):
+        super().__init__(
+            position=position,
+            direction=direction,
+            speed=PLAYER_BULLET_SPEED,
+            owner="player",
+            damage=damage,
+            color=(92, 244, 255),
+            radius=5,
+        )
 
-    def move(self):
-        return pygame.Vector2(self.elapsed, math.sin(self.elapsed/50)*50) 
+
+class EnemyProjectile(Projectile):
+    def __init__(self, position, direction, damage=12):
+        super().__init__(
+            position=position,
+            direction=direction,
+            speed=ENEMY_BULLET_SPEED,
+            owner="enemy",
+            damage=damage,
+            color=(255, 92, 151),
+            radius=6,
+            lifetime=3.5,
+        )
